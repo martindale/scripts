@@ -1,15 +1,16 @@
 'use strict';
 
-async function main () {
-  constructor (settings = {}) {
-    super(settings);
+const settings = require('../settings/local');
+const Filesystem = require('@fabric/core/types/filesystem');
 
-    this.settings = Object.assign({
-      name: '@portal/tesseract'
-    }, this.settings, settings);
+async function main (input = {}) {
+  const tesseract = new Filesystem();
 
-    return this;
-  }
+  return this;
 }
 
-module.exports = main();
+main(settings).catch((exception) => {
+  console.error(exception);
+}).then((output) => {
+  console.log(output);
+});
