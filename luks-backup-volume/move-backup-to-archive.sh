@@ -5,14 +5,27 @@
 set -euo pipefail
 
 : "${ARCHIVE_MOUNT:=/media/archive}"
-: "${BACKUPS_ROOT:=$HOME/backups}"
+
+# With sudo, $HOME is often /root — default BACKUPS_ROOT to the invoking user's ~/backups.
+if [[ -z "${BACKUPS_ROOT:-}" ]]; then
+  if [[ "${EUID:-$(id -u)}" -eq 0 && -n "${SUDO_USER:-}" ]]; then
+    BACKUPS_ROOT="$(getent passwd -- "$SUDO_USER" | cut -d: -f6)/backups"
+  else
+    BACKUPS_ROOT="${HOME}/backups"
+  fi
+fi
 
 usage() {
   cat <<USAGE
-Usage: sudo $0 [options] <target>
+Usage: sudo $0 [options] <target | /path/to/source/>
 
-  Rsync ${BACKUPS_ROOT}/<target>/ -> ${ARCHIVE_MOUNT}/<target>/ and delete each
-  source file after it is successfully transferred.
+  Mode A — basename only:
+    Rsync ${BACKUPS_ROOT}/<target>/ -> ${ARCHIVE_MOUNT}/<target>/
+
+  Mode B — path (contains /):
+    Rsync that directory -> ${ARCHIVE_MOUNT}/<basename>/
+
+  Uses rsync --remove-source-files (source files removed only after successful copy).
 
 Options:
   --dry-run, -n     rsync dry run (no writes, no source deletions)
@@ -21,13 +34,13 @@ Options:
 
 Environment:
   ARCHIVE_MOUNT   default ${ARCHIVE_MOUNT}
-  BACKUPS_ROOT    default ${BACKUPS_ROOT} (resolved symlink is fine)
+  BACKUPS_ROOT    default ${BACKUPS_ROOT} (under sudo: /home/<SUDO_USER>/backups)
   RSYNC_OPTS      extra rsync args (quoted string)
 
-Requires root if ${ARCHIVE_MOUNT} is not writable as your user.
-
-Remaining dirs you mentioned (examples):
-  goliath  meta  mail.fabric.pub  mail.ericmartindale.com
+Examples:
+  sudo $0 git.roleplaygateway.com
+  sudo $0 /home/eric/backups/git.roleplaygateway.com
+  sudo env BACKUPS_ROOT=/home/eric/storage/backups $0 meta
 USAGE
 }
 
@@ -70,13 +83,40 @@ if [[ -z "$TARGET" ]]; then
   exit 1
 fi
 
-if [[ "$TARGET" == *"/"* || "$TARGET" == "." || "$TARGET" == ".." ]]; then
-  echo "Refusing target with path components: $TARGET" >&2
-  exit 1
+# Expand leading ~ using the real user's home when root (quoted "~/backups/foo").
+if [[ "$TARGET" == "~" || "$TARGET" == "~/"* ]]; then
+  _uh="$(getent passwd -- "${SUDO_USER:-$USER}" | cut -d: -f6)"
+  TARGET="${TARGET/#\~/${_uh}}"
 fi
 
-SRC="${BACKUPS_ROOT%/}/${TARGET}/"
-DST="${ARCHIVE_MOUNT%/}/${TARGET}/"
+ARCHIVE_NAME=""
+
+if [[ "$TARGET" == *"/"* ]]; then
+  if [[ "$TARGET" =~ (^|/)\.\.(/|$) ]]; then
+    echo "Refusing path with '..': $TARGET" >&2
+    exit 1
+  fi
+  _src="${TARGET%/}"
+  if [[ ! -d "$_src" ]]; then
+    echo "Source is not a directory: $_src" >&2
+    exit 1
+  fi
+  SRC="${_src}/"
+  ARCHIVE_NAME="$(basename "$_src")"
+  if [[ -z "$ARCHIVE_NAME" || "$ARCHIVE_NAME" == "." || "$ARCHIVE_NAME" == ".." ]]; then
+    echo "Invalid archive name from path: $TARGET" >&2
+    exit 1
+  fi
+else
+  if [[ "$TARGET" == "." || "$TARGET" == ".." ]]; then
+    echo "Refusing target: $TARGET" >&2
+    exit 1
+  fi
+  SRC="${BACKUPS_ROOT%/}/${TARGET}/"
+  ARCHIVE_NAME="$TARGET"
+fi
+
+DST="${ARCHIVE_MOUNT%/}/${ARCHIVE_NAME}/"
 
 if [[ ! -d "$SRC" ]]; then
   echo "Source is not a directory: $SRC" >&2
