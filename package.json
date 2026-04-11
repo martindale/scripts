@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "twitter-archive": "node twitter-archive.js"
+  },
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "crypto-js": "^4.2.0",
+    "sjcl": "^1.0.8",
+    "twitter-api-v2": "^1.27.0",
+    "xml2js": "^0.6.2"
+  }
+}
