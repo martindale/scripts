@@ -26,12 +26,6 @@ Environment: STORAGE_ROOT, VOL_FILE, MAPPER_NAME, POOL_NAME, PERCENT
 USAGE
 }
 
-# losetup/LUKS expect backing file length on a 512-byte boundary; avoid tail truncation warning.
-align_up_512() {
-  local n="$1"
-  echo $(( (n + 511) / 512 * 512 ))
-}
-
 expand_volume() {
   local add_bytes="$1"
   local cur new_size loop mp

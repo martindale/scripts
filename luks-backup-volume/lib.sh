@@ -45,6 +45,23 @@ human_bytes() {
   numfmt --to=iec-i --suffix=B "$b" 2>/dev/null || echo "${b} bytes"
 }
 
+# losetup/LUKS expect backing file length on a 512-byte boundary.
+align_up_512() {
+  local n="$1"
+  echo $(( (n + 511) / 512 * 512 ))
+}
+
+# Grow VOL_FILE by 0–511 bytes if needed so the first losetup attach does not warn.
+ensure_vol_file_loop_aligned() {
+  local cur aligned
+  cur=$(stat -c%s "$VOL_FILE")
+  aligned=$(align_up_512 "$cur")
+  if [[ "$aligned" -ne "$cur" ]]; then
+    echo "Aligning $VOL_FILE to $(human_bytes "$aligned") (512-byte boundary for losetup/LUKS)." >&2
+    truncate -s "$aligned" "$VOL_FILE"
+  fi
+}
+
 loop_for_vol_file() {
   losetup -j "$VOL_FILE" 2>/dev/null | head -1 | cut -d: -f1 || true
 }

@@ -11,6 +11,7 @@ fi
 
 LOOP=$(loop_for_vol_file)
 if [[ -z "$LOOP" ]]; then
+  ensure_vol_file_loop_aligned
   LOOP=$(losetup --find --show "$VOL_FILE")
   echo "Attached $LOOP"
 else

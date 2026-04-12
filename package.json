@@ -3,6 +3,7 @@
     "twitter-archive": "node twitter-archive.js"
   },
   "dependencies": {
+    "@fabric/core": "github:FabricLabs/fabric#feature/v0.1.0-RC1",
     "blessed": "^0.1.81",
     "crypto-js": "^4.2.0",
     "sjcl": "^1.0.8",
