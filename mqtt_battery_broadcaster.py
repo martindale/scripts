@@ -1,3 +1,4 @@
+import errno
 import json
 import logging
 import os
@@ -141,33 +142,55 @@ def get_battery_status() -> Optional[Dict[str, Any]]:
     return None
 
 
-def on_connect(client, userdata, flags, rc):
-    """Callback when MQTT client connects."""
+def on_connect_v2(client, userdata, connect_flags, reason_code, properties):
+    """Callback when MQTT client connects (paho-mqtt callback API version 2)."""
+    if reason_code == 0:
+        logger.info("Connected to MQTT broker at %s:%s", MQTT_BROKER, MQTT_PORT)
+    else:
+        logger.error("Failed to connect to MQTT broker: %s", reason_code)
+
+
+def on_disconnect_v2(client, userdata, disconnect_flags, reason_code, properties):
+    """Callback when MQTT client disconnects (callback API version 2)."""
+    if reason_code != 0:
+        logger.warning("Disconnected from MQTT broker: %s", reason_code)
+
+
+def on_publish_v2(client, userdata, mid, reason_code, properties):
+    """Callback when message is published (callback API version 2)."""
+    logger.debug("Message published with id: %s", mid)
+
+
+def on_connect_v1(client, userdata, flags, rc):
+    """Callback when MQTT client connects (legacy paho-mqtt callback API version 1)."""
     if rc == 0:
         logger.info("Connected to MQTT broker at %s:%s", MQTT_BROKER, MQTT_PORT)
     else:
         logger.error("Failed to connect to MQTT broker, return code %s", rc)
 
 
-def on_disconnect(client, userdata, rc):
-    """Callback when MQTT client disconnects."""
+def on_disconnect_v1(client, userdata, rc):
+    """Callback when MQTT client disconnects (callback API version 1)."""
     if rc != 0:
         logger.warning("Unexpected disconnection from MQTT broker (code %s)", rc)
 
 
-def on_publish(client, userdata, mid):
-    """Callback when message is published."""
+def on_publish_v1(client, userdata, mid):
+    """Callback when message is published (callback API version 1)."""
     logger.debug("Message published with id: %s", mid)
 
 
 def _make_mqtt_client():
-    """Construct a paho client compatible with v1 and v2 APIs."""
+    """
+    Prefer paho-mqtt 2.x callback API version 2 (no VERSION1 deprecation warning).
+    Fall back to a plain Client() on older paho-mqtt 1.x installs.
+    """
     try:
         from paho.mqtt.enums import CallbackAPIVersion
 
-        return mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION1)
+        return mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2), "v2"
     except (ImportError, AttributeError, TypeError):
-        return mqtt.Client()
+        return mqtt.Client(), "v1"
 
 
 def main():
@@ -177,10 +200,15 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    client = _make_mqtt_client()
-    client.on_connect = on_connect
-    client.on_disconnect = on_disconnect
-    client.on_publish = on_publish
+    client, mqtt_callback_api = _make_mqtt_client()
+    if mqtt_callback_api == "v2":
+        client.on_connect = on_connect_v2
+        client.on_disconnect = on_disconnect_v2
+        client.on_publish = on_publish_v2
+    else:
+        client.on_connect = on_connect_v1
+        client.on_disconnect = on_disconnect_v1
+        client.on_publish = on_publish_v1
 
     if MQTT_USERNAME and MQTT_PASSWORD:
         client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
@@ -208,6 +236,27 @@ def main():
                     logger.warning("Failed to publish message, return code: %s", result.rc)
             time.sleep(BROADCAST_INTERVAL)
 
+    except ConnectionRefusedError:
+        logger.error(
+            "Could not connect to MQTT broker at %s:%s (connection refused). "
+            "Nothing is listening on that address; start a broker (for example Mosquitto) "
+            "or set MQTT_BROKER (and MQTT_PORT) to a reachable host. "
+            "This repo: `docker compose -f mqtt/docker-compose.yml up -d` (needs Docker). "
+            "Running with sudo does not fix this error.",
+            MQTT_BROKER,
+            MQTT_PORT,
+        )
+    except OSError as e:
+        if e.errno == errno.ECONNREFUSED:
+            logger.error(
+                "Could not connect to MQTT broker at %s:%s (connection refused). "
+                "Start a broker or set MQTT_BROKER to a reachable host. "
+                "This repo: `docker compose -f mqtt/docker-compose.yml up -d`.",
+                MQTT_BROKER,
+                MQTT_PORT,
+            )
+        else:
+            logger.error("Error in main loop: %s", e)
     except Exception as e:
         logger.error("Error in main loop: %s", e)
 

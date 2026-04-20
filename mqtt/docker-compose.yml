@@ -1,0 +1,14 @@
+# Local MQTT (Mosquitto) on port 1883 — matches script defaults (MQTT_BROKER=localhost, MQTT_PORT=1883).
+#
+# From repository root:
+#   docker compose -f mqtt/docker-compose.yml up -d
+# Stop:
+#   docker compose -f mqtt/docker-compose.yml down
+#
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
