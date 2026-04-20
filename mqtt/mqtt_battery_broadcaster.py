@@ -241,7 +241,7 @@ def main():
             "Could not connect to MQTT broker at %s:%s (connection refused). "
             "Nothing is listening on that address; start a broker (for example Mosquitto) "
             "or set MQTT_BROKER (and MQTT_PORT) to a reachable host. "
-            "This repo: `docker compose -f mqtt/docker-compose.yml up -d` (needs Docker). "
+            "From repo root: `docker compose -f mqtt/docker-compose.yml up -d` (needs Docker). "
             "Running with sudo does not fix this error.",
             MQTT_BROKER,
             MQTT_PORT,
@@ -251,7 +251,7 @@ def main():
             logger.error(
                 "Could not connect to MQTT broker at %s:%s (connection refused). "
                 "Start a broker or set MQTT_BROKER to a reachable host. "
-                "This repo: `docker compose -f mqtt/docker-compose.yml up -d`.",
+                "From repo root: `docker compose -f mqtt/docker-compose.yml up -d`.",
                 MQTT_BROKER,
                 MQTT_PORT,
             )

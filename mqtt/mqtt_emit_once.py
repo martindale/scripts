@@ -6,12 +6,12 @@ Environment (same defaults as mqtt_battery_broadcaster.py):
   MQTT_BROKER, MQTT_PORT, MQTT_TOPIC, MQTT_USERNAME, MQTT_PASSWORD
   MQTT_QOS (0|1|2, default 1), MQTT_RETAIN (0|1, default 0)
 
-CLI examples:
-  python3 mqtt_emit_once.py '{"ping":true}'
-  python3 mqtt_emit_once.py --topic sensors/demo --message hello
-  echo '{"x":1}' | python3 mqtt_emit_once.py
+CLI examples (from repo root):
+  python3 mqtt/mqtt_emit_once.py '{"ping":true}'
+  python3 mqtt/mqtt_emit_once.py --topic sensors/demo --message hello
+  echo '{"x":1}' | python3 mqtt/mqtt_emit_once.py
 
-Python:
+Python (with mqtt on sys.path, e.g. ``sys.path.insert(0, "mqtt")``):
   from mqtt_emit_once import emit_once
   emit_once('{"ping":true}')
 """
